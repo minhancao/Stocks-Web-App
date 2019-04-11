@@ -8,3 +8,6 @@ A web app that allows the user to view a stock's graph and statistics. This app 
 4. Enter “cd ..” to go back a folder and then enter “cd client” to go to client folder and enter the command: npm install
 5. Now enter “cd ..” to go back a folder
 6. Now enter “npm run dev”, this will start up both the server and client servers, wait a little while and the webpage should pop up on localhost:3000
+
+# Live Demo
+Live demo deployed on Heroku: https://calm-inlet-63792.herokuapp.com/
