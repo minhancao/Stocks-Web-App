@@ -84,9 +84,10 @@ class Stockspage extends Component {
   constructor(props) {
     super(props);
     this.state = {
+      stockSelect: "",
       stocks: {},
       display: "linechart",
-      zoomDomain: { x: [new Date(2017, 3, 20), new Date(2019, 3, 20)] },
+      zoomDomain: {},
       visible: false,
       stocksInfo: {},
       strokeColors: {},
@@ -174,6 +175,7 @@ class Stockspage extends Component {
           strokeColors: color,
           stocksInfo: newStock2
         });
+        console.log(this.state.stocks);
         console.log(this.state.stocksInfo);
       }
     });
@@ -184,7 +186,13 @@ class Stockspage extends Component {
     delete newStock[stockID];
     var color = this.state.strokeColors;
     delete color[stockID];
-    this.setState({ stocks: newStock, strokeColors: color });
+    var stockInfo2 = this.state.stocksInfo;
+    delete stockInfo2[stockID];
+    this.setState({
+      stocks: newStock,
+      strokeColors: color,
+      stocksInfo: stockInfo2
+    });
   };
 
   handleZoom(domain) {
@@ -234,11 +242,85 @@ class Stockspage extends Component {
     }
   }
 
+  handleClick = e => {
+    console.log("click ", e);
+    console.log(e.key);
+    this.setState({ stockSelect: e.key });
+  };
+
   // Render the content
   renderChart = () => {
     // What page should show?
     switch (this.state.display) {
       case "linechart":
+        return (
+          <div>
+            <VictoryChart
+              width={this.state.chartWidth}
+              height={750}
+              scale={{ x: "time" }}
+              containerComponent={
+                <VictoryZoomVoronoiContainer
+                  labels={d =>
+                    `${d.x.toLocaleString("en-us", {
+                      month: "long"
+                    })} ${d.x.getDate()}, ${d.x.getFullYear()}, ${d.Close}`
+                  }
+                  zoomDimension="x"
+                  zoomDomain={this.state.zoomDomain}
+                  onZoomDomainChange={this.handleZoom.bind(this)}
+                />
+              }
+            >
+              <VictoryAxis crossAxis label="Time" />
+              <VictoryAxis
+                dependentAxis
+                label="Price(USD)"
+                style={{ axisLabel: { padding: 35 } }}
+              />
+
+              <VictoryLine
+                key={this.state.stockSelect}
+                style={{
+                  data: {
+                    stroke: this.state.strokeColors[this.state.stockSelect]
+                  }
+                }}
+                data={this.state.stocks[this.state.stockSelect]}
+                x="x"
+                y="Close"
+              />
+            </VictoryChart>
+            <VictoryChart
+              padding={{ top: 0, left: 50, right: 50, bottom: 30 }}
+              width={this.state.chartWidth}
+              height={100}
+              scale={{ x: "time" }}
+              containerComponent={
+                <VictoryBrushContainer
+                  brushDimension="x"
+                  brushDomain={this.state.zoomDomain}
+                  onBrushDomainChange={this.handleZoom.bind(this)}
+                />
+              }
+            >
+              <VictoryAxis tickFormat={x => new Date(x).getFullYear()} />
+              <VictoryLine
+                key={this.state.stockSelect}
+                style={{
+                  data: {
+                    stroke: this.state.strokeColors[this.state.stockSelect]
+                  }
+                }}
+                data={this.state.stocks[this.state.stockSelect]}
+                x="x"
+                y="Close"
+              />
+            </VictoryChart>
+          </div>
+        );
+
+      case "linecharts":
         return (
           <div>
             <VictoryChart
@@ -378,6 +460,7 @@ class Stockspage extends Component {
               theme="dark"
               mode="inline"
               defaultSelectedKeys={["1"]}
+              onClick={this.handleClick}
               style={{ height: "100%", borderRight: 0, paddingTop: "10px" }}
             >
               <Button
@@ -446,6 +529,16 @@ class Stockspage extends Component {
                     style={{ position: "relative", bottom: "4px" }}
                   />
                   Line Chart
+                </Menu.Item>
+                <Menu.Item
+                  key="linecharts"
+                  onClick={() => this.setState({ display: "linecharts" })}
+                >
+                  <Icon
+                    type="line-chart"
+                    style={{ position: "relative", bottom: "4px" }}
+                  />
+                  Line Charts
                 </Menu.Item>
 
                 <Menu.Item

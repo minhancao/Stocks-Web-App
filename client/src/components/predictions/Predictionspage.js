@@ -29,6 +29,8 @@ import axios from "axios";
 
 const { Header, Content, Sider, Footer } = Layout;
 
+const SubMenu = Menu.SubMenu;
+
 const sampleData = [
   { x: 1, y: 2 },
   { x: 2, y: 3 },
@@ -77,6 +79,9 @@ class Predictionspage extends Component {
       chartWidth: window.innerWidth
     });
     window.addEventListener("resize", this.updateDimensions.bind(this));
+    this.getStock("AAPL");
+    this.getStock("GOOG");
+    this.getStock("AMZN");
   }
   componentWillUnmount() {
     window.removeEventListener("resize", this.updateDimensions, false);
@@ -84,14 +89,25 @@ class Predictionspage extends Component {
   constructor(props) {
     super(props);
     this.state = {
+      stocksPrediction: {},
+      predictionStrokeColors: {},
+      predictSelect: "",
+      predictionLoaded: { AAPL: false, GOOG: false, AMZN: false },
       stocks: {},
       display: "predictionmodel",
-      zoomDomain: { x: [new Date(2017, 3, 20), new Date(2019, 3, 20)] },
+      zoomDomain: {},
       visible: false,
       stocksInfo: {},
       strokeColors: {},
       chartWidth: 0,
-      modal1Visible: false
+      defaultWidth: 0,
+      modal1Visible: false,
+      trainVisible: false,
+      errorTrainingVisible: false,
+      predictVisible: false,
+      errorPredictVisible: false,
+      modelStatus: "Last Updated - ",
+      predictStatus: ""
     }; //this is how you set up state
   }
 
@@ -108,6 +124,35 @@ class Predictionspage extends Component {
       color += letters[Math.floor(Math.random() * 16)];
     }
     return color;
+  }
+
+  setTrainVisible(trainVisible) {
+    this.setState({ trainVisible });
+  }
+
+  setErrorTrainVisible(errorTrainVisible) {
+    this.setState({ errorTrainVisible });
+  }
+
+  setPredictVisible(predictVisible) {
+    var a = this.state.predictionLoaded;
+    a[this.state.predictSelect] = true;
+    this.setState({
+      predictVisible,
+      predictStatus:
+        "Prediction for " + this.state.predictSelect + " model done.",
+      predictionLoaded: a
+    });
+  }
+
+  setErrorPredictVisible(errorPredictVisible) {
+    this.setState({
+      errorPredictVisible,
+      predictStatus:
+        "Prediction for " +
+        this.state.predictSelect +
+        " model was not successful."
+    });
   }
 
   setModal1Visible(modal1Visible) {
@@ -130,7 +175,7 @@ class Predictionspage extends Component {
       }
 
       console.log("Received values of form: ", values);
-      this.getStock(values["Stock Symbol"]);
+      this.getModel(values["Stock Symbol"]);
       form.resetFields();
       this.setState({ visible: false });
     });
@@ -138,6 +183,92 @@ class Predictionspage extends Component {
 
   saveFormRef = formRef => {
     this.formRef = formRef;
+  };
+
+  trainModel = () => {
+    axios.get("/train/" + this.state.predictSelect).then(res => {
+      var sigh = [];
+      const hmm = JSON.parse(res.data);
+      console.log(hmm.includes("Finished training."));
+      if (hmm.includes("Finished training")) {
+        this.setTrainVisible(true);
+      } else {
+        this.setErrorTrainVisible(true);
+      }
+    });
+  };
+
+  predictModel = () => {
+    this.setState({
+      predictStatus:
+        "Predicting " +
+        this.state.predictSelect +
+        " model, please wait, a modal will pop up when it is done..."
+    });
+    console.log(this.state.predictSelect);
+    axios.get("/predict/" + this.state.predictSelect).then(res => {
+      var sigh = [];
+      const hmm = JSON.parse(res.data);
+      console.log(hmm.includes("Error"));
+      if (hmm.includes("Error")) {
+        this.setErrorPredictVisible(true);
+      } else {
+        var index = 0;
+        for (index = 0; index < hmm.length; index++) {
+          sigh.push({
+            x: new Date(hmm[index].Date + "T12:00:00Z"),
+            Predictions: hmm[index].Close
+          });
+        }
+        var newStock = this.state.stocksPrediction;
+        newStock[this.state.predictSelect] = sigh;
+        var color = this.state.predictionStrokeColors;
+        color[this.state.predictSelect] = this.getRandomColor();
+        this.setState({
+          stocksPrediction: newStock,
+          predictionStrokeColors: color
+        });
+        console.log(this.state.stocksPrediction);
+        this.setPredictVisible(true);
+      }
+    });
+  };
+
+  getModel = stockID => {
+    axios.get("/models/" + stockID).then(res => {
+      var sigh = [];
+      const hmm = JSON.parse(res.data);
+      console.log(hmm.includes("Error"));
+      if (hmm.includes("Error")) {
+        this.setModal1Visible(true);
+      } else {
+        var index = 0;
+        for (index = 0; index < hmm.length; index++) {
+          sigh.push({
+            x: new Date(hmm[index].Date + "T12:00:00Z"),
+            Predictions: hmm[index].Predictions,
+            Close: hmm[index].Close
+          });
+        }
+        var newStock = this.state.stocks;
+        newStock[stockID] = sigh;
+        var color = this.state.strokeColors;
+        color[stockID] = this.getRandomColor();
+        var newStock2 = this.state.stocksInfo;
+        var date1 = new Date("2018-03-01" + "T12:00:00Z");
+        var newStock3 = this.state.stocks[stockID].filter(
+          item => +date1 === +item.x
+        )[0];
+        newStock2[stockID] = newStock3;
+        this.setState({
+          stocks: newStock,
+          strokeColors: color,
+          stocksInfo: newStock2
+        });
+        console.log(this.state.stocks);
+        console.log(this.state.stocksInfo);
+      }
+    });
   };
 
   getStock = stockID => {
@@ -184,7 +315,13 @@ class Predictionspage extends Component {
     delete newStock[stockID];
     var color = this.state.strokeColors;
     delete color[stockID];
-    this.setState({ stocks: newStock, strokeColors: color });
+    var stockInfo2 = this.state.stocksInfo;
+    delete stockInfo2[stockID];
+    this.setState({
+      stocks: newStock,
+      strokeColors: color,
+      stocksInfo: stockInfo2
+    });
   };
 
   handleZoom(domain) {
@@ -224,13 +361,21 @@ class Predictionspage extends Component {
       this.setState({ stocksInfo: newStock });
       console.log(this.state.stocksInfo);
     } else {
-      newStock1 = {
-        "No Stock Data": "No stock data was recorded for this date."
-      };
-      newStock[stockID] = newStock1;
-      this.setState({ stocksInfo: newStock });
-      console.log(this.state.stocksInfo);
-      console.log("Date cannot be found");
+      var test = this.state.stocksPrediction[stockID].filter(
+        item => +date1 === +item.x
+      )[0];
+      if (test != null) {
+        newStock[stockID] = test;
+        this.setState({ stocksInfo: newStock });
+        console.log(this.state.stocksInfo);
+      } else {
+        newStock1 = {
+          "No Stock Data": "No stock data was recorded for this date."
+        };
+        newStock[stockID] = newStock1;
+        this.setState({ stocksInfo: newStock });
+        console.log(this.state.stocksInfo);
+      }
     }
   }
 
@@ -241,7 +386,44 @@ class Predictionspage extends Component {
       case "predictionmodel":
         return (
           <div style={{ align: "left" }}>
-            Prediction Model
+            <Button
+              type="default"
+              shape="round"
+              size="large"
+              onClick={this.trainModel}
+            >
+              Update/Train Model{" "}
+              <Icon
+                type="edit"
+                style={{
+                  position: "relative",
+                  left: "4px",
+                  bottom: "3px",
+                  color: "red"
+                }}
+              />
+            </Button>
+            <Button
+              type="default"
+              shape="round"
+              size="large"
+              onClick={this.predictModel}
+            >
+              Predict next 60 stock points movement{" "}
+              <Icon
+                type="stock"
+                style={{
+                  position: "relative",
+                  left: "4px",
+                  bottom: "3px",
+                  color: "red"
+                }}
+              />
+            </Button>
+            <div style={{ align: "left" }}>
+              <p>Model Status: {this.state.modelStatus}</p>
+              <p>Predict Status: {this.state.predictStatus}</p>
+            </div>
           </div>
         ); //pass method to child
 
@@ -252,7 +434,6 @@ class Predictionspage extends Component {
               width={this.state.chartWidth}
               height={750}
               scale={{ x: "time" }}
-              domain={{ y: [0, 3000] }}
               containerComponent={
                 <VictoryZoomVoronoiContainer
                   labels={d =>
@@ -270,26 +451,42 @@ class Predictionspage extends Component {
               <VictoryAxis
                 dependentAxis
                 label="Price(USD)"
-                domain={[0, 3000]}
                 style={{ axisLabel: { padding: 35 } }}
               />
-              {Object.keys(this.state.stocks).map(key => (
+
+              <VictoryLine
+                key={this.state.predictSelect}
+                style={{
+                  data: {
+                    stroke: this.state.strokeColors[this.state.predictSelect]
+                  }
+                }}
+                data={this.state.stocks[this.state.predictSelect]}
+                x="x"
+                y="Close"
+              />
+              {this.state.predictionLoaded[this.state.predictSelect] ? (
                 <VictoryLine
-                  key={key}
+                  key={"predict" + this.state.predictSelect}
                   style={{
-                    data: { stroke: this.state.strokeColors[key] }
+                    data: {
+                      stroke: this.state.predictionStrokeColors[
+                        this.state.predictSelect
+                      ]
+                    }
                   }}
-                  data={this.state.stocks[key]}
+                  data={this.state.stocksPrediction[this.state.predictSelect]}
                   x="x"
-                  y="Close"
+                  y="Predictions"
                 />
-              ))}
+              ) : (
+                <div />
+              )}
             </VictoryChart>
             <VictoryChart
               padding={{ top: 0, left: 50, right: 50, bottom: 30 }}
               width={this.state.chartWidth}
               height={100}
-              domain={{ y: [0, 3000] }}
               scale={{ x: "time" }}
               containerComponent={
                 <VictoryBrushContainer
@@ -300,17 +497,17 @@ class Predictionspage extends Component {
               }
             >
               <VictoryAxis tickFormat={x => new Date(x).getFullYear()} />
-              {Object.keys(this.state.stocks).map(key => (
-                <VictoryLine
-                  key={key}
-                  style={{
-                    data: { stroke: this.state.strokeColors[key] }
-                  }}
-                  data={this.state.stocks[key]}
-                  x="x"
-                  y="Close"
-                />
-              ))}
+              <VictoryLine
+                key={this.state.predictSelect}
+                style={{
+                  data: {
+                    stroke: this.state.strokeColors[this.state.predictSelect]
+                  }
+                }}
+                data={this.state.stocks[this.state.predictSelect]}
+                x="x"
+                y="Close"
+              />
             </VictoryChart>
           </div>
         ); //pass method to child
@@ -367,14 +564,57 @@ class Predictionspage extends Component {
     }
   };
 
-  handleClick = (e) => {
-    console.log('click ', e);
-    console.log(e.key)
-  }
+  handleClick = e => {
+    console.log("click ", e);
+    console.log(e.key);
+    this.setState({ predictSelect: e.key });
+  };
 
   render() {
     return (
       <div className="App">
+        <Modal
+          title="Training Done"
+          style={{}}
+          visible={this.state.trainVisible}
+          onOk={() => this.setTrainVisible(false)}
+          onCancel={() => this.setTrainVisible(false)}
+        >
+          <p>Training for {this.state.predictSelect} model is finished.</p>
+        </Modal>
+        <Modal
+          title="Training Error"
+          style={{}}
+          visible={this.state.errorTrainVisible}
+          onOk={() => this.setErrorTrainVisible(false)}
+          onCancel={() => this.setErrorTrainVisible(false)}
+        >
+          <p>
+            Error: Training for {this.state.predictSelect} model was not able to
+            be completed.
+          </p>
+        </Modal>
+        <Modal
+          title="Predictions Done"
+          style={{}}
+          visible={this.state.predictVisible}
+          onOk={() => this.setPredictVisible(false)}
+          onCancel={() => this.setPredictVisible(false)}
+        >
+          <p>Predictions for {this.state.predictSelect} model is finished.</p>
+        </Modal>
+        <Modal
+          title="Predictions Error"
+          style={{}}
+          visible={this.state.errorPredictVisible}
+          onOk={() => this.setErrorPredictVisible(false)}
+          onCancel={() => this.setErrorPredictVisible(false)}
+        >
+          <p>
+            Error: Predictions for {this.state.predictSelect} model was not able
+            to be completed.
+          </p>
+        </Modal>
         <Modal
           title="Error"
           style={{}}
@@ -398,6 +638,7 @@ class Predictionspage extends Component {
                 shape="round"
                 size="large"
                 onClick={this.showModal}
+                style={{ marginBottom: "10px" }}
               >
                 Add a stock{" "}
                 <Icon
@@ -450,7 +691,7 @@ class Predictionspage extends Component {
                 style={{ lineHeight: "64px" }}
                 align="left"
               >
-              <Menu.Item
+                <Menu.Item
                   key="predictionmodel"
                   onClick={() => this.setState({ display: "predictionmodel" })}
                 >
