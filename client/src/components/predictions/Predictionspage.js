@@ -89,6 +89,7 @@ class Predictionspage extends Component {
   constructor(props) {
     super(props);
     this.state = {
+      lastTrained: {},
       stocksPrediction: {},
       predictionStrokeColors: {},
       predictSelect: "",
@@ -128,6 +129,13 @@ class Predictionspage extends Component {
 
   setTrainVisible(trainVisible) {
     this.setState({ trainVisible });
+  }
+
+  setTrainVisible2(trainVisible) {
+    this.setState({
+      trainVisible,
+      modelStatus: this.state.predictSelect + " Model Training done."
+    });
   }
 
   setErrorTrainVisible(errorTrainVisible) {
@@ -175,7 +183,7 @@ class Predictionspage extends Component {
       }
 
       console.log("Received values of form: ", values);
-      this.getModel(values["Stock Symbol"]);
+      this.getStock(values["Stock Symbol"]);
       form.resetFields();
       this.setState({ visible: false });
     });
@@ -185,15 +193,31 @@ class Predictionspage extends Component {
     this.formRef = formRef;
   };
 
+  readTextFile = file => {
+    axios.get("/logs/" + file).then(res => {
+      var split = res.data.split(":");
+      this.setState({
+        modelStatus:
+          this.state.predictSelect + " Model Last Trained: " + split[0]
+      });
+    });
+  };
+
   trainModel = () => {
+    this.setState({
+      modelStatus:
+        "Training " +
+        this.state.predictSelect +
+        " model, please wait as it may take a long time, a modal will pop up when it is done..."
+    });
+    this.setTrainVisible(true);
     axios.get("/train/" + this.state.predictSelect).then(res => {
-      var sigh = [];
       const hmm = JSON.parse(res.data);
-      console.log(hmm.includes("Finished training."));
-      if (hmm.includes("Finished training")) {
-        this.setTrainVisible(true);
-      } else {
+      console.log(hmm.includes("Training"));
+      if (hmm.includes("Error")) {
         this.setErrorTrainVisible(true);
+      } else {
+        this.setTrainVisible(true);
       }
     });
   };
@@ -567,6 +591,7 @@ class Predictionspage extends Component {
   handleClick = e => {
     console.log("click ", e);
     console.log(e.key);
+    this.readTextFile("log_" + e.key + ".txt");
     this.setState({ predictSelect: e.key });
   };
 
@@ -577,10 +602,13 @@ class Predictionspage extends Component {
           title="Training Done"
           style={{}}
           visible={this.state.trainVisible}
-          onOk={() => this.setTrainVisible(false)}
-          onCancel={() => this.setTrainVisible(false)}
+          onOk={() => this.setTrainVisible2(false)}
+          onCancel={() => this.setTrainVisible2(false)}
         >
-          <p>Training for {this.state.predictSelect} model is finished.</p>
+          <p>
+            Training for {this.state.predictSelect} model will take a while
+            depending on the stock. Please wait at least 5 minutes.
+          </p>
         </Modal>
         <Modal
           title="Training Error"

@@ -14,6 +14,25 @@ app.use(
 app.use(bodyParser.json());
 
 // Routes
+app.get("/logs/:id", (req, res) => {
+  const fs = require("fs");
+  if (fs.existsSync(req.params.id)) {
+    // Do something
+    var content;
+    // First I want to read the file
+    fs.readFile(req.params.id, "utf8", function read(err, data) {
+      if (err) {
+        throw err;
+      }
+      content = data;
+
+      // Invoke the next step here however you like
+      console.log(content); // Put all of the code here (not the best solution)
+      res.send(content);
+    });
+  }
+});
+
 app.get("/train/:id", (req, res) => {
   var { PythonShell } = require("python-shell");
   var pyshell = new PythonShell("trainFrontend.py");
@@ -32,7 +51,7 @@ app.get("/train/:id", (req, res) => {
       throw err;
     }
 
-    console.log("finished");
+    console.log("finished training");
   });
 });
 
@@ -54,7 +73,7 @@ app.get("/predict/:id", (req, res) => {
       throw err;
     }
 
-    console.log("finished");
+    console.log("finished predicting");
   });
 });
 

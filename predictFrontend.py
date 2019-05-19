@@ -105,19 +105,11 @@ file_name = 'model_%s.h5'%ticker
 
 if(os.path.isfile(file_name) is False):
 	# create and fit the LSTM network
-	model = Sequential()
-	model.add(LSTM(units=50, return_sequences=True, input_shape=(x_train.shape[1],1)))
-	model.add(LSTM(units=50))
-	model.add(Dense(1))
-
-	model.compile(loss='mean_squared_error', optimizer='adam')
-	model.fit(x_train, y_train, epochs=1, batch_size=1, verbose=1)
-
-	model.save(file_name)
+	print(json.dumps("Error: Model has not been trained yet."))
 
 else:
 	train = dataset[:,:]
-	model = load_model('model_AAPL.h5')
+	model = load_model(file_name)
 	#predicting test here
 	"""inputs2 = new_data[len(train)-60:len(train)].values
 
